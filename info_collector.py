@@ -15,8 +15,9 @@ class Info(ABC):
 
 
 class PokemonInfoRaw(Info):
-    def __init__(self, id, types, stats, moves, species, past_types) -> None:
+    def __init__(self, id, name, types, stats, moves, species, past_types) -> None:
         self.id = id
+        self.name = name
         self.types = types
         self.stats = stats
         self.moves = moves
@@ -71,16 +72,17 @@ class PokemonInfoRaw(Info):
         moves = PokemonInfoRaw.__aggregate_moves(self.moves)
         types = PokemonInfoRaw.__aggregate_types(self.types)
         types_by_generation = PokemonInfoRaw.__aggregate_past_types(self.past_types, types)
-        return PokemonInfo(self.id, species_name, stats, moves, types_by_generation)
+        return PokemonInfo(self.id, self.name, species_name, stats, moves, types_by_generation)
 
 
     def __str__(self):
-        return f"ID: {self.id}\nTypes: {self.types}\nStats: {self.stats}\nMoves: {self.moves}\nSpecies : {self.species}\nPast types: {self.past_types}"
+        return f"ID: {self.id}\nName: {self.name}\nTypes: {self.types}\nStats: {self.stats}\nMoves: {self.moves}\nSpecies : {self.species}\nPast types: {self.past_types}"
 
 
 class PokemonInfo(Info):
-    def __init__(self, id: int, species_name: str, stats: "list[int]", moves: "list[str]", types_by_generation: "dict(str, list[str])") -> None:
+    def __init__(self, id: int, pokemon_name: str, species_name: str, stats: "list[int]", moves: "list[str]", types_by_generation: "dict(str, list[str])") -> None:
         self.id = id
+        self.name = pokemon_name
         self.species = species_name
         self.stats = stats
         self.moves = moves
@@ -93,7 +95,7 @@ class PokemonInfo(Info):
 
 
     def __str__(self):
-        return f"ID: {self.id}\nSpecies: {self.species}\nStats: {self.stats}\nMoves: {self.moves}\nTypes by generation: {self.types_by_generation}\n"
+        return f"ID: {self.id}\nName: {self.name}\nSpecies: {self.species}\nStats: {self.stats}\nMoves: {self.moves}\nTypes by generation: {self.types_by_generation}\n"
 
 
 class GenerationInfo(Info):
@@ -155,12 +157,13 @@ def __get_pokemon_info_from_url(url: str, max_queries_number: int):
     time.sleep(1 / max_queries_number)
     json_file = __load_json_file(url)
     pokemon_id = json_file["id"]
+    pokemon_name = json_file["name"]
     pokemon_types = json_file["types"]
     pokemon_stats = json_file["stats"]
     pokemon_moves = json_file["moves"]
     pokemon_species = json_file["species"]
     pokemon_past_types = json_file["past_types"]
-    return PokemonInfoRaw(pokemon_id, pokemon_types, pokemon_stats, pokemon_moves, pokemon_species, pokemon_past_types)
+    return PokemonInfoRaw(pokemon_id, pokemon_name, pokemon_types, pokemon_stats, pokemon_moves, pokemon_species, pokemon_past_types)
 
 
 def __get_generation_info_from_url(url: str, max_queries_number: int):
