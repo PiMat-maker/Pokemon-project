@@ -8,8 +8,6 @@ import info_collector
 
 import json
 
-from thread_test_2 import convert_to_json_str
-
 
 AWS_CONN_ID = "s3"
 SNOWPIPE_FILES_PREFIX = "{{var.value.snowpipe_files}}"
@@ -30,12 +28,12 @@ def _print_message(message: str) -> None:
     print(message)
 
 
-def _choose_branch(default_task: str, **kwards) -> "list[str]":
+def _choose_branch(default_tasks: "list[str]", **kwards) -> "list[str]":
     config = kwards.get('dag_run').conf
     if 'copy' in config and config['copy']:
-        return ["copy_info"]
+        return ['copy_generation_info', 'copy_type_info', 'copy_pokemon_info']
 
-    return [default_task]
+    return default_tasks
 
 
 def _load_string_on_s3(data: str, key: str) -> None:
@@ -53,24 +51,18 @@ def _remove_files_on_s3(bucket, key, filenames: "list[str]"):
         _remove_file_on_s3(bucket, f'{key}{filename}')
 
 
-def _copy_info_from_api_to_s3(api_url: str, s3_prefix: str, pokemon_filename, generation_filename, type_filename):
-    full_info = info_collector.copy_info_from_api(api_url)
-    pokemons_info_in_dict = info_collector.convert_list_object_to_dict(full_info.pokemons_info)
-    generations_info_in_dict = info_collector.convert_list_object_to_dict(full_info.generations_info)
-    types_info_in_dict = info_collector.convert_list_object_to_dict(full_info.types_info)
-    pokemons_info_json_str = info_collector.convert_to_json_str(pokemons_info_in_dict)
-    generations_info_json_str = info_collector.convert_to_json_str(generations_info_in_dict)
-    types_info_json_str = info_collector.convert_to_json_str(types_info_in_dict)
-
+def _copy_info_from_api_to_s3(api_url: str, s3_prefix: str, what_info: str, filename: str, offset: int = 0, saved_info: "list[dict(str, str)]" = []):
     bucket, key = __get_bucket_and_key(f'{s3_prefix}Kudlakov/')
-    _remove_files_on_s3(bucket, key, [pokemon_filename, generation_filename])
 
-    s3_pokemon_key = f"s3://{bucket}/{key}{pokemon_filename}"
-    s3_generation_key = f"s3://{bucket}/{key}{generation_filename}"
-    s3_type_key = f"s3://{bucket}/{key}{type_filename}"
-    _load_string_on_s3(pokemons_info_json_str, s3_pokemon_key)
-    _load_string_on_s3(generations_info_json_str, s3_generation_key)
-    _load_string_on_s3(types_info_json_str, s3_type_key)
+    info = info_collector.copy_info_from_api(api_url, what_info, offset)
+    info_in_dict = info_collector.convert_list_object_to_dict(info)
+    full_info_in_dict = saved_info + info_in_dict
+    info_json_str = info_collector.convert_to_json_str(full_info_in_dict)
+   
+    _remove_files_on_s3(bucket, key, [filename])
+
+    s3_key = f"s3://{bucket}/{key}{filename}"
+    _load_string_on_s3(info_json_str, s3_key)
 
 
 def __get_info_from_json_file_on_s3(bucket: str, key: str, keys: "list[str]", filename: str) -> "list[dict(str, str)]":
@@ -82,36 +74,15 @@ def __get_info_from_json_file_on_s3(bucket: str, key: str, keys: "list[str]", fi
     return []
 
 
-def _load_new_info_from_api_to_s3(api_url: str, s3_prefix: str, pokemon_filename, generation_filename, type_filename):
+def _load_new_info_from_api_to_s3(api_url: str, s3_prefix: str, what_info: str, filename: str):
     bucket, key = __get_bucket_and_key(f'{s3_prefix}Kudlakov/')
     s3hook = S3Hook()
     keys = s3hook.list_keys(bucket_name=bucket, prefix=key, delimiter='/')
 
-    pokemons_info_in_dict = __get_info_from_json_file_on_s3(bucket, key, keys, pokemon_filename)
-    generations_info_in_dict =  __get_info_from_json_file_on_s3(bucket, key, keys, generation_filename)
-    types_info_in_dict =  __get_info_from_json_file_on_s3(bucket, key, keys, type_filename)
+    info_in_dict = __get_info_from_json_file_on_s3(bucket, key, keys, filename)
     
-    pokemons_amount = len(pokemons_info_in_dict)
-    generations_amount = len(generations_info_in_dict)
-    types_amount = len(types_info_in_dict)
-
-    full_info = info_collector.copy_info_from_api(api_url, pokemon_offset=pokemons_amount, generation_offset=generations_amount, type_offset=types_amount)
-    pokemons_info_in_dict += info_collector.convert_list_object_to_dict(full_info.pokemons_info)
-    generations_info_in_dict += info_collector.convert_list_object_to_dict(full_info.generations_info)
-    types_info_in_dict += info_collector.convert_list_object_to_dict(full_info.types_info)
-
-    pokemons_info_json_str = info_collector.convert_to_json_str(pokemons_info_in_dict)
-    generations_info_json_str = info_collector.convert_to_json_str(generations_info_in_dict)
-    types_info_json_str = info_collector.convert_to_json_str(types_info_in_dict)
-
-    _remove_files_on_s3(bucket, key, [pokemon_filename, generation_filename, type_filename])
-
-    s3_pokemon_key = f"s3://{bucket}/{key}{pokemon_filename}"
-    s3_generation_key = f"s3://{bucket}/{key}{generation_filename}"
-    s3_type_key = f"s3://{bucket}/{key}{type_filename}"
-    _load_string_on_s3(pokemons_info_json_str, s3_pokemon_key)
-    _load_string_on_s3(generations_info_json_str, s3_generation_key)
-    _load_string_on_s3(types_info_json_str, s3_type_key)
+    amount = len(info_in_dict)
+    _copy_info_from_api_to_s3(api_url, s3_prefix, what_info, filename, offset=amount, saved_info=info_in_dict)
 
 
 def _clean_directory(s3_prefix) -> None:
@@ -139,26 +110,10 @@ with DAG(
     branch_task = BranchPythonOperator(
         task_id="branch",
         python_callable=_choose_branch,
-        op_args=['load_new_info']
+        op_args=[['load_new_generation_info', 'load_new_type_info', 'load_new_pokemon_info']]
     )
 
-    copy_info_task = PythonOperator(
-        task_id='copy_info',
-        python_callable=_copy_info_from_api_to_s3,
-        op_args=[POKEMON_API, SNOWPIPE_FILES_PREFIX, POKEMON_FILENAME, GENERATION_FILENAME]
-    )
-
-    load_new_info_task = PythonOperator(
-        task_id='load_new_info',
-        python_callable=_load_new_info_from_api_to_s3,
-        op_args=[POKEMON_API, SNOWPIPE_FILES_PREFIX, POKEMON_FILENAME, GENERATION_FILENAME]
-    )
-
-#    cleanup_task  = PythonOperator(
-#        task_id='cleanup',
-#        python_callable=_clean_directory,
-#        op_args=[UNPROCESSED_FILES_PREFIX]
-#    )
+    start_task >> branch_task
 
     success_task = PythonOperator(
         task_id='success',
@@ -174,9 +129,21 @@ with DAG(
         trigger_rule=TriggerRule.ALL_FAILED
     )
 
-    start_task >> branch_task
-    branch_task >> [copy_info_task, load_new_info_task]
-    copy_info_task >> [success_task, failed_task]
-    load_new_info_task >> [success_task, failed_task]
+    for filename in [GENERATION_FILENAME, TYPE_FILENAME, POKEMON_FILENAME]:
+        what_info = filename[:filename.rfind(".")]
+        copy_info_task = PythonOperator(
+            task_id=f'copy_{what_info}_info',
+            python_callable=_copy_info_from_api_to_s3,
+            op_args=[POKEMON_API, SNOWPIPE_FILES_PREFIX, what_info, filename]
+        )
+        branch_task >> copy_info_task >> [success_task, failed_task]
 
-    #cleanup_task >> [success_task, failed_task]
+
+    for filename in [GENERATION_FILENAME, TYPE_FILENAME, POKEMON_FILENAME]:
+        what_info = filename[:filename.rfind(".")]
+        load_new_info_task = PythonOperator(
+            task_id=f'load_new_{what_info}_info',
+            python_callable=_load_new_info_from_api_to_s3,
+            op_args=[POKEMON_API, SNOWPIPE_FILES_PREFIX, what_info, filename]
+        )
+        branch_task >> load_new_info_task >> [success_task, failed_task]
