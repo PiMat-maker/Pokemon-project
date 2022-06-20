@@ -1,4 +1,3 @@
-from sched import scheduler
 from airflow import DAG
 from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.utils.dates import days_ago
@@ -19,7 +18,7 @@ GENERATION_FILENAME = "generation.json"
 TYPE_FILENAME = "type.json"
 
 
-def __get_bucket_and_key(s3_prefix) -> "list[str]":
+def __get_bucket_and_key(s3_prefix: str) -> "list[str]":
     bucket, key = S3Hook.parse_s3_url(s3_prefix)
     return [bucket, key]
 
@@ -30,7 +29,7 @@ def _print_message(message: str) -> None:
 
 def _choose_branch(default_tasks: "list[str]", **kwards) -> "list[str]":
     config = kwards.get('dag_run').conf
-    if 'copy' in config and config['copy']:
+    if 'copy' in config and config['copy'] == "True":
         return ['copy_generation_info', 'copy_type_info', 'copy_pokemon_info']
 
     return default_tasks
@@ -41,12 +40,12 @@ def _load_string_on_s3(data: str, key: str) -> None:
     s3hook.load_string(string_data=data, key=key)
 
 
-def _remove_file_on_s3(bucket, key):
+def _remove_file_on_s3(bucket: str, key: str):
     s3hook = S3Hook()
     s3hook.delete_objects(bucket=bucket, keys=key)
 
 
-def _remove_files_on_s3(bucket, key, filenames: "list[str]"):
+def _remove_files_on_s3(bucket: str, key: str, filenames: "list[str]"):
     for filename in filenames:
         _remove_file_on_s3(bucket, f'{key}{filename}')
 
@@ -85,7 +84,7 @@ def _load_new_info_from_api_to_s3(api_url: str, s3_prefix: str, what_info: str, 
     _copy_info_from_api_to_s3(api_url, s3_prefix, what_info, filename, offset=amount, saved_info=info_in_dict)
 
 
-def _clean_directory(s3_prefix) -> None:
+def _clean_directory(s3_prefix: str) -> None:
     bucket, key = __get_bucket_and_key(f'{s3_prefix}Kudlakov/')
     s3hook = S3Hook()
     keys = s3hook.list_keys(bucket_name=bucket, prefix=key, delimiter='/')

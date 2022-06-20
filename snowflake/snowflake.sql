@@ -98,7 +98,7 @@ create or replace table Roman_Kudlakov.storage.pokemon_moves(
 
 create or replace task Roman_Kudlakov.staging.moving_stg_species
 warehouse = tasks_wh
-schedule = '5 minute'
+schedule = 'USING CRON 0 3 * * * UTC'
 when system$stream_has_data('Roman_Kudlakov.staging.stg_generations_stream')
 as
 insert into Roman_Kudlakov.storage.species(species_name, first_generation)
@@ -106,54 +106,54 @@ select src_3.value::varchar as species_name,
         first_generation
 from (select parse_json(src_1.value):id::int as first_generation,
        parse_json(src_1.value):pokemon_species as species_names
-   from Roman_Kudlakov.staging.stg_generations src,
+   from Roman_Kudlakov.staging.stg_generations_stream src,
    lateral flatten(input => src.json_data) src_1) src_2,
    lateral flatten(input => src_2.species_names) src_3
    where METADATA$ACTION = 'INSERT';
    
 create or replace task Roman_Kudlakov.staging.moving_stg_moves
 warehouse = tasks_wh
-schedule = '5 minute'
+schedule = 'USING CRON 0 3 * * * UTC'
 when system$stream_has_data('Roman_Kudlakov.staging.stg_moves_stream')
 as
 insert into Roman_Kudlakov.storage.moves(move_name)
 select distinct move_name from
 (select src_3.value::varchar as move_name
 from (select parse_json(src_1.value):moves as moves
-   from Roman_Kudlakov.staging.stg_pokemons src,
+   from Roman_Kudlakov.staging.stg_moves_stream src,
    lateral flatten(input => src.json_data) src_1) src_2,
    lateral flatten(input => src_2.moves) src_3)
    where r = 1 and METADATA$ACTION = 'INSERT';
 
 create or replace task Roman_Kudlakov.staging.moving_stg_stats
 warehouse = tasks_wh
-schedule = '5 minute'
+schedule = 'USING CRON 0 3 * * * UTC'
 when system$stream_has_data('Roman_Kudlakov.staging.stg_stats_stream')
 as
 insert into Roman_Kudlakov.storage.stats(pokemon_id, hp, attack, defense, special_attack, special_defense, speed)
 select pokemon_id, stats[0]::int, stats[1]::int,  stats[2]::int,  stats[3]::int,  stats[4]::int,  stats[5]::int 
 from (select parse_json(src_1.value):id::int as pokemon_id,
        parse_json(src_1.value):stats as stats
-   from Roman_Kudlakov.staging.stg_pokemons src,
+   from Roman_Kudlakov.staging.stg_stats_stream src,
    lateral flatten(input => src.json_data) src_1) src_2
    where METADATA$ACTION = 'INSERT';
    
 create or replace task Roman_Kudlakov.staging.moving_stg_types
 warehouse = tasks_wh
-schedule = '5 minute'
+schedule = 'USING CRON 0 3 * * * UTC'
 when system$stream_has_data('Roman_Kudlakov.staging.stg_types_stream')
 as
 insert into Roman_Kudlakov.storage.types(type_id, type_name)
 select
        parse_json(src_1.value):id::int as type_id,
        parse_json(src_1.value):name::varchar as type_name
-   from Roman_Kudlakov.staging.stg_types src,
+   from Roman_Kudlakov.staging.stg_types_stream src,
    lateral flatten(input => src.json_data) src_1
    where METADATA$ACTION = 'INSERT';
    
 create or replace task Roman_Kudlakov.staging.moving_stg_pokemons
 warehouse = tasks_wh
-schedule = '5 minute'
+schedule = 'USING CRON 0 3 * * * UTC'
 when system$stream_has_data('Roman_Kudlakov.staging.stg_pokemons_stream')
 as
 insert into Roman_Kudlakov.storage.pokemons(pokemon_id, pokemon_name, species_id)
@@ -161,14 +161,14 @@ select pokemon_id, pokemon_name, species_id
 from (select parse_json(src_1.value):id::int as pokemon_id,
        parse_json(src_1.value):name::varchar as pokemon_name,
        parse_json(src_1.value):species::varchar as species_name
-   from Roman_Kudlakov.staging.stg_pokemons src,
+   from Roman_Kudlakov.staging.stg_pokemons_stream src,
    lateral flatten(input => src.json_data) src_1) src_2
    Join Roman_Kudlakov.storage.species USING(species_name)
    where METADATA$ACTION = 'INSERT';   
    
 create or replace task Roman_Kudlakov.staging.moving_stg_pokemon_moves
 warehouse = tasks_wh
-schedule = '5 minute'
+schedule = 'USING CRON 0 3 * * * UTC'
 when system$stream_has_data('Roman_Kudlakov.staging.stg_pokemon_moves_stream')
 as
 insert into Roman_Kudlakov.storage.pokemon_moves(move_id, pokemon_id)
@@ -176,7 +176,7 @@ select move_id, pokemon_id
 from (select src_3.value::varchar as move_name, pokemon_id
 from (select parse_json(src_1.value):id::int as pokemon_id,
       parse_json(src_1.value):moves as moves
-   from Roman_Kudlakov.staging.stg_pokemons src,
+   from Roman_Kudlakov.staging.stg_pokemon_moves_stream src,
    lateral flatten(input => src.json_data) src_1) src_2,
    lateral flatten(input => src_2.moves) src_3) src_4
    Join Roman_Kudlakov.storage.moves USING(move_name)
@@ -184,7 +184,7 @@ from (select parse_json(src_1.value):id::int as pokemon_id,
    
 create or replace task Roman_Kudlakov.staging.moving_pokemon_types_by_first_generation
 warehouse = tasks_wh
-schedule = '5 minute'
+schedule = 'USING CRON 0 3 * * * UTC'
 when system$stream_has_data('Roman_Kudlakov.staging.stg_pokemon_types_stream')
 as
 insert into Roman_Kudlakov.storage.pokemon_types_by_first_generation(type_id, pokemon_id, first_generation)
@@ -194,7 +194,7 @@ from (select first_generation, src_5.value as type_name, pokemon_id
 from (select src_3.key::int as first_generation, src_3.value as type_names, pokemon_id
 from (select parse_json(src_1.value):id::int as pokemon_id,
       parse_json(src_1.value):types_by_generation as types_by_generation
-   from Roman_Kudlakov.staging.stg_pokemons src,
+   from Roman_Kudlakov.staging.stg_pokemon_types_stream src,
    lateral flatten(input => src.json_data) src_1) src_2,
    lateral flatten(input => src_2.types_by_generation) src_3) src_4,
    lateral flatten(input => src_4.type_names) src_5) src_6

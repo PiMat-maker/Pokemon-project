@@ -14,71 +14,6 @@ class Info(ABC):
         super().__init__() 
 
 
-class PokemonInfoRaw(Info):
-    def __init__(self, id, name, types, stats, moves, species, past_types) -> None:
-        self.id = id
-        self.name = name
-        self.types = types
-        self.stats = stats
-        self.moves = moves
-        self.species = species
-        self.past_types = past_types
-
-
-    def __new__(cls, *args, **kwargs):
-        instance = super(PokemonInfoRaw, cls).__new__(cls)
-        return instance
-
-
-    def __aggregate_species(species) -> str:
-        return species["name"]
-
-
-    def __aggregate_stats(stats) -> "list[int]":
-        return [stat["base_stat"] for stat in stats if "base_stat" in stat]
-
-
-    def __aggregate_moves(moves) -> "list[str]":
-        return [move["move"]["name"] for move in moves if "move" in move and "name" in move["move"] ]
-        
-
-    def __aggregate_types(types) -> "list[str]":
-        return [type_el["type"]["name"] for type_el in types if "type" in type_el and "name" in type_el["type"]]
-
-
-    def __get_id(url: str, what_id: str) -> int:
-        what_id_pos = url.rfind(f"{what_id}/") + len(f"{what_id}/")
-        print(url)
-        return int(url[what_id_pos:-1])
-
-
-    def __aggregate_past_types(past_types, actual_types) -> "dict(str, list[str])":
-        types_by_generation = dict()
-        first_generation_id = 0
-        for past_type in past_types:
-            last_generation_id = PokemonInfoRaw.__get_id(past_type["generation"]["url"], "generation")
-            types = PokemonInfoRaw.__aggregate_types(past_type["types"])
-            types_by_generation[first_generation_id] = types
-            first_generation_id = last_generation_id + 1
-
-        types_by_generation[first_generation_id] = actual_types
-
-        return types_by_generation
-
-
-    def create_pokemon_info(self):
-        species_name = PokemonInfoRaw.__aggregate_species(self.species)
-        stats = PokemonInfoRaw.__aggregate_stats(self.stats) 
-        moves = PokemonInfoRaw.__aggregate_moves(self.moves)
-        types = PokemonInfoRaw.__aggregate_types(self.types)
-        types_by_generation = PokemonInfoRaw.__aggregate_past_types(self.past_types, types)
-        return PokemonInfo(self.id, self.name, species_name, stats, moves, types_by_generation)
-
-
-    def __str__(self):
-        return f"ID: {self.id}\nName: {self.name}\nTypes: {self.types}\nStats: {self.stats}\nMoves: {self.moves}\nSpecies : {self.species}\nPast types: {self.past_types}"
-
-
 class PokemonInfo(Info):
     def __init__(self, id: int, pokemon_name: str, species_name: str, stats: "list[int]", moves: "list[str]", types_by_generation: "dict(str, list[str])") -> None:
         self.id = id
@@ -94,8 +29,73 @@ class PokemonInfo(Info):
         return instance
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"ID: {self.id}\nName: {self.name}\nSpecies: {self.species}\nStats: {self.stats}\nMoves: {self.moves}\nTypes by generation: {self.types_by_generation}\n"
+
+
+class PokemonInfoRaw(Info):
+    def __init__(self, id: int, name: str, types: "dict", stats: "dict", moves: "dict", species: "dict", past_types: "dict") -> None:
+        self.id = id
+        self.name = name
+        self.types = types
+        self.stats = stats
+        self.moves = moves
+        self.species = species
+        self.past_types = past_types
+
+
+    def __new__(cls, *args, **kwargs):
+        instance = super(PokemonInfoRaw, cls).__new__(cls)
+        return instance
+
+
+    def __aggregate_species(species: "dict") -> str:
+        return species["name"]
+
+
+    def __aggregate_stats(stats: "dict") -> "list[int]":
+        return [stat["base_stat"] for stat in stats if "base_stat" in stat]
+
+
+    def __aggregate_moves(moves: "dict") -> "list[str]":
+        return [move["move"]["name"] for move in moves if "move" in move and "name" in move["move"] ]
+        
+
+    def __aggregate_types(types: "dict") -> "list[str]":
+        return [type_el["type"]["name"] for type_el in types if "type" in type_el and "name" in type_el["type"]]
+
+
+    def __get_id(url: str, what_id: str) -> int:
+        what_id_pos = url.rfind(f"{what_id}/") + len(f"{what_id}/")
+        print(url)
+        return int(url[what_id_pos:-1])
+
+
+    def __aggregate_past_types(past_types: "dict(str, str)", actual_types: "list[str]") -> "dict(str, list[str])":
+        types_by_generation = dict()
+        first_generation_id = 0
+        for past_type in past_types:
+            last_generation_id = PokemonInfoRaw.__get_id(past_type["generation"]["url"], "generation")
+            types = PokemonInfoRaw.__aggregate_types(past_type["types"])
+            types_by_generation[first_generation_id] = types
+            first_generation_id = last_generation_id + 1
+
+        types_by_generation[first_generation_id] = actual_types
+
+        return types_by_generation
+
+
+    def create_pokemon_info(self) -> PokemonInfo:
+        species_name = PokemonInfoRaw.__aggregate_species(self.species)
+        stats = PokemonInfoRaw.__aggregate_stats(self.stats) 
+        moves = PokemonInfoRaw.__aggregate_moves(self.moves)
+        types = PokemonInfoRaw.__aggregate_types(self.types)
+        types_by_generation = PokemonInfoRaw.__aggregate_past_types(self.past_types, types)
+        return PokemonInfo(self.id, self.name, species_name, stats, moves, types_by_generation)
+
+
+    def __str__(self) -> str:
+        return f"ID: {self.id}\nName: {self.name}\nTypes: {self.types}\nStats: {self.stats}\nMoves: {self.moves}\nSpecies : {self.species}\nPast types: {self.past_types}"
 
 
 class GenerationInfo(Info):
@@ -109,7 +109,7 @@ class GenerationInfo(Info):
         return instance
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"ID: {self.id}\nPokemon species: {self.pokemon_species}\n"
 
 
@@ -129,7 +129,7 @@ class TypeInfo(Info):
         return int(url[what_id_pos:-1])
 
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Type ID: {self.id}\nType name: {self.name}\n"
 
 
@@ -141,10 +141,10 @@ def __get_json_file(url: str, offset: int = 0, limit: int = 1000):
 def __get_list(url: str, list_name: str, offset: int) -> "list[str]":
     list_url = f"{url}{list_name}/"
     len_list = __get_json_file(list_url, limit=1)["count"]
-    return __get_json_file(list_url, offset=offset, limit=len_list - offset)["results"] #change to len_list !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    return __get_json_file(list_url, offset=offset, limit=len_list - offset)["results"]
 
 
-def __get_urls_list(raw_list: "list[dict(str, str)]"):
+def __get_urls_list(raw_list: "list[dict(str, str)]") -> "list[str]":
     return [el["url"] for el in raw_list]
 
 
@@ -153,7 +153,7 @@ def __load_json_file(url: str):
     return response.json()
 
 
-def __get_pokemon_info_from_url(url: str, max_queries_number: int):
+def __get_pokemon_info_from_url(url: str, max_queries_number: int) -> PokemonInfoRaw:
     time.sleep(1 / max_queries_number)
     json_file = __load_json_file(url)
     pokemon_id = json_file["id"]
@@ -166,7 +166,7 @@ def __get_pokemon_info_from_url(url: str, max_queries_number: int):
     return PokemonInfoRaw(pokemon_id, pokemon_name, pokemon_types, pokemon_stats, pokemon_moves, pokemon_species, pokemon_past_types)
 
 
-def __get_generation_info_from_url(url: str, max_queries_number: int):
+def __get_generation_info_from_url(url: str, max_queries_number: int) -> GenerationInfo:
     time.sleep(1 / max_queries_number)
     json_file = __load_json_file(url)
     generation_id = json_file["id"]
@@ -178,15 +178,15 @@ def __get_type_info_from_type_dict(type: "dict(str, str)") -> TypeInfo:
     return TypeInfo(type["url"], type["name"])
 
 
-def convert_list_object_to_dict(objects_list):
+def convert_list_object_to_dict(objects_list: "list[Info]") ->  "list[dict]":
     return [el.__dict__ for el in objects_list]
 
 
-def convert_to_json_str(dicts_list):
+def convert_to_json_str(dicts_list: "list[dict]"):
     return json.dumps(dicts_list)
 
 
-def copy_info_from_api(url: str, what_info: str, what_offset = 0) -> Info:
+def copy_info_from_api(url: str, what_info: str, what_offset = 0) -> "list[Info]":
     what_list = __get_list(url, what_info, what_offset)
 
     if what_info != "type":
@@ -204,7 +204,7 @@ def copy_info_from_api(url: str, what_info: str, what_offset = 0) -> Info:
         if what_info == "type":
                 return [__get_type_info_from_type_dict(type_dict) for type_dict in what_list]
     
-    return Info()
+    return [Info()]
 
 
 if __name__ == '__main__':

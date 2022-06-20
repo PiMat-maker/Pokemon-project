@@ -1,4 +1,3 @@
-from sched import scheduler
 from airflow import DAG
 from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
@@ -18,7 +17,7 @@ GENERATIONS_FILENAME = "generation.json"
 POKEMON_API = "https://pokeapi.co/api/v2/"
 
 
-def __get_bucket_and_key(s3_prefix) -> "list[str]":
+def __get_bucket_and_key(s3_prefix: str) -> "list[str]":
     bucket, key = S3Hook.parse_s3_url(s3_prefix)
     return [bucket, key]
 
@@ -52,8 +51,7 @@ def _check_new_generations(s3_prefix: str, generations_filename: str, url_prefix
     json_key = __get_json_key_by_filename(generations_filename, keys)
     
     if json_key == "":
-        #Later here will be logger
-        _print_message("There is no generations file. So we upload it now")
+        _print_message("INFO ABOUT GENERATIONS: There is no generations file. So we upload it now")
         return ['trigger_load_dag']
     
     generations_info_json_str = s3hook.read_key(key=json_key, bucket_name=bucket)
@@ -62,8 +60,10 @@ def _check_new_generations(s3_prefix: str, generations_filename: str, url_prefix
     generations_json_api = __get_api_file(url_prefix, generations_filename)
 
     if len(generations_info) != generations_json_api["count"]:
+        _print_message("INFO ABOUT GENERATIONS: There are new generations data. So we upload it now")
         return ['trigger_load_dag']
 
+    _print_message("INFO ABOUT GENERATIONS: There is no new generations file. Everything is up to date")
     return ['no_new_generations']
 
 
